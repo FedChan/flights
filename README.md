@@ -1,6 +1,6 @@
-> Apparently, it's always a better approach to interact with the Internal Google APIs. I'm working on that, and I'll deliver the results soon if my experimental project works out well.
+Try out the dev version: [**Pypi (`3.0rc0`)**](https://pypi.org/project/fast-flights/3.0rc0/)
 
-<br /><br />
+<br /><br /><br />
 <div align="center">
 
 # ✈️ fast-flights

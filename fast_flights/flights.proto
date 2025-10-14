@@ -10,6 +10,7 @@ message FlightData {
   repeated Airport from_flight = 13;
   repeated Airport to_flight = 14;
   optional int32 max_stops = 5;
+  repeated string airlines = 6;
 }
 
 enum Seat {
@@ -40,4 +41,14 @@ message Info {
   Seat seat = 9;
   repeated Passenger passengers = 8;
   Trip trip = 19;
+}
+
+message Price {
+  int32 price = 1;
+  string currency = 3;
+}
+
+message ItinerarySummary {
+  string flights = 2;
+  Price price = 3;
 }

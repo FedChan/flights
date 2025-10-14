@@ -1,6 +1,7 @@
 """Typed implementation of flights_pb2.py"""
 
 import base64
+from dataclasses import dataclass
 from typing import Any, List, Optional, TYPE_CHECKING, Literal, Union
 
 from . import flights_pb2 as PB
@@ -9,6 +10,7 @@ from ._generated_enum import Airport
 if TYPE_CHECKING:
     PB: Any
 
+AIRLINE_ALLIANCES = ["SKYTEAM", "STAR_ALLIANCE", "ONEWORLD"]
 
 class FlightData:
     """Represents flight data.
@@ -19,14 +21,16 @@ class FlightData:
         to_airport (str): Arrival (airport). Where to?
         airlines (list(str), optional): A list of airlines. Default is None.
         max_stops (int, optional): Maximum number of stops. Default is None.
+        airlines (List[str], optional): Airlines this flight should be taken with. Default is None.
     """
 
-    __slots__ = ("date", "from_airport", "to_airport", "airlines", "max_stops")
+    __slots__ = ("date", "from_airport", "to_airport", "max_stops", "airlines")
     date: str
     from_airport: str
     to_airport: str
     airlines: Optional[List[str]]
     max_stops: Optional[int]
+    airlines: Optional[List[str]]
 
     def __init__(
         self,
@@ -46,6 +50,21 @@ class FlightData:
         ).split(',')
         self.airlines = airlines
         self.max_stops = max_stops
+        # TODO: All the list of airlines should technically be added to ._generated_enum like Airports
+        # but I don't know how to find the comprehensive list of airlines now.
+        if airlines is not None:
+            self.airlines = []
+            for airline in airlines:
+                airline = airline.upper()
+                if not (len(airline) == 2 or airline in AIRLINE_ALLIANCES):
+                    raise ValueError(
+                        f"Invalid airline code: {airline}. "
+                        f"Airline codes should be 2 characters long or in the list of airline alliances: {AIRLINE_ALLIANCES}"
+                    )
+                self.airlines.append(airline)
+        else:
+            # make it consistent with self.max_stops and set it to None
+            self.airlines = None
 
     def attach(self, info: PB.Info) -> None:  # type: ignore
         data = info.data.add()
@@ -58,13 +77,16 @@ class FlightData:
             data.airlines[:] = self.airlines
         if self.max_stops is not None:
             data.max_stops = self.max_stops
+        if self.airlines is not None:
+            data.airlines.extend(self.airlines)
 
     def __repr__(self) -> str:
         return (
             f"FlightData(date={self.date!r}, "
             f"from_airport={self.from_airport}, "
             f"to_airport={self.to_airport}, "
-            f"max_stops={self.max_stops})"
+            f"max_stops={self.max_stops}, "
+            f"airlines={self.airlines}"
         )
 
 
@@ -185,3 +207,15 @@ class TFSData:
     def __repr__(self) -> str:
         return f"TFSData(flight_data={self.flight_data!r}, max_stops={self.max_stops!r})"
 
+@dataclass
+class ItinerarySummary:
+    flights: str
+    price: int
+    currency: str
+
+    @classmethod
+    def from_b64(cls, b64_string: str) -> 'ItinerarySummary':
+        raw = base64.b64decode(b64_string)
+        pb = PB.ItinerarySummary()
+        pb.ParseFromString(raw)
+        return cls(pb.flights, pb.price.price / 100, pb.price.currency)
