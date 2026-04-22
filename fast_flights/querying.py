@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime as Datetime
 from typing import Literal, Optional, Union
 
-from .pb.flights_pb2 import Airport, FlightData, Info, Passenger, Seat, Trip
+from .pb.flights_pb2 import Airport, FlightData, Info, Passenger, Seat, Trip, Bags
 from .types import Currency, Language, SeatType, TripType
 
 
@@ -17,6 +17,9 @@ class Query:
     passengers: list[Passenger]
     language: str
     currency: str
+    max_price: int | None = None
+    bags: Bags | None = Bags(carry_on_bags=0, unknown=0)
+    no_self_transfer: bool | None = None
 
     def pb(self) -> Info:
         """(internal) Protobuf data. (`Info`)"""
@@ -25,6 +28,9 @@ class Query:
             seat=self.seat,
             trip=self.trip,
             passengers=self.passengers,
+            max_price=self.max_price,
+            bags=self.bags,
+            no_self_transfer=self.no_self_transfer,
         )
 
     def to_bytes(self) -> bytes:
@@ -64,6 +70,15 @@ class FlightQuery:
     to_airport: str
     max_stops: int | None = None
     airlines: list[str] | None = None
+    departure_min_hour: int | None = None
+    departure_max_hour: int | None = None
+    arrival_min_hour: int | None = None
+    arrival_max_hour: int | None = None
+    max_flight_duration_minutes: int | None = None
+    connecting_airport: list[str] | None = None
+    min_connection_time_minutes: int | None = None
+    max_connection_time_minutes: int | None = None
+    less_emissions: bool | None = None
 
     def pb(self) -> FlightData:
         if isinstance(self.date, str):
@@ -71,12 +86,29 @@ class FlightQuery:
         else:
             date = self.date.strftime("%Y-%m-%d")
 
+        from_airports = []
+        for airport in self.from_airport.split(","):
+            from_airports.append(Airport(airport=airport))
+
+        to_airports = []
+        for airport in self.to_airport.split(","):
+            to_airports.append(Airport(airport=airport))
+
         return FlightData(
             date=date,
-            from_airport=Airport(airport=self.from_airport),
-            to_airport=Airport(airport=self.to_airport),
+            from_airport=from_airports,
+            to_airport=to_airports,
             max_stops=self.max_stops,
             airlines=self.airlines,
+            departure_min_hour = self.departure_min_hour,
+            departure_max_hour = self.departure_max_hour,
+            arrival_min_hour = self.arrival_min_hour,
+            arrival_max_hour = self.arrival_max_hour,
+            max_flight_duration_minutes = self.max_flight_duration_minutes,
+            connecting_airport = self.connecting_airport,
+            min_connection_time_minutes = self.min_connection_time_minutes,
+            max_connection_time_minutes = self.max_connection_time_minutes,
+            less_emissions = self.less_emissions,
         )
 
     def _setmaxstops(self, m: int | None = None) -> "FlightQuery":
@@ -139,6 +171,9 @@ def create_query(
     language: str | Literal[""] | Language = "",
     currency: str | Literal[""] | Currency = "",
     max_stops: int | None = None,
+    max_price: int | None = None,
+    carry_on_bags: int | None = None,
+    no_self_transfer: bool | None = None,
 ) -> Query:
     """Create a query.
 
@@ -150,6 +185,9 @@ def create_query(
         language: Set the language. Use `""` (blank str) to let Google decide.
         currency: Set the currency. Use `""` (blank str) to let Google decide.
         max_stops (optional): Set the maximum stops for every flight query, if present.
+        max_price (optional): Set the maximum price for the trip.
+        carry_on_bags (optional): Set the amount of carry-on bags.
+        no_self_transfer (optional): Set whether to exclude self-transfer in connecting flights.
     """
     return Query(
         flight_data=[flight._setmaxstops(max_stops).pb() for flight in flights],
@@ -158,4 +196,7 @@ def create_query(
         passengers=passengers.pb(),
         language=language,
         currency=currency,
+        max_price=max_price,
+        bags=Bags(carry_on_bags=carry_on_bags, unknown=0),
+        no_self_transfer=no_self_transfer,
     )

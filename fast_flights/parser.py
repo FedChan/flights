@@ -1,4 +1,5 @@
 import json
+import re
 
 from selectolax.lexbor import LexborHTMLParser
 
@@ -23,17 +24,21 @@ class MetaList(list[Flights]):
 def parse(html: str) -> MetaList:
     parser = LexborHTMLParser(html)
 
+    total_durations = re.findall(r"aria-label=.Total duration (.*?)\.", html)
+
     # find js
     script = parser.css_first(r"script.ds\:1")
-    return parse_js(script.text())
+    return parse_js(script.text(), total_durations)
 
 
 # Data discovery by @kftang, huge shout out!
-def parse_js(js: str):
+def parse_js(js: str, total_durations: list[str]):
     data = js.split("data:", 1)[1].rsplit(",", 1)[0]
-    print(data)
+    # print(data)
 
     payload = json.loads(data)
+
+    # import ipdb; ipdb.set_trace()
 
     alliances = []
     airlines = []
@@ -55,7 +60,7 @@ def parse_js(js: str):
     if payload[3][0] is None:
         return flights
 
-    for k in payload[3][0]:
+    for k, total_duration in zip(payload[3][0], total_durations):
         flight = k[0]
         price = k[1][0][1]
 
@@ -70,11 +75,20 @@ def parse_js(js: str):
             to_airport = Airport(code=single_flight[6], name=single_flight[5])
             departure_time = single_flight[8]
             departure_date = single_flight[20]
+            if len(departure_time) == 1:
+                departure_time += [0]
+            departure_time = [0 if val is None else val for val in departure_time]
             departure = SimpleDatetime(date=departure_date, time=departure_time)
 
             arrival_time = single_flight[10]
             arrival_date = single_flight[21]
+            if len(arrival_time) == 1:
+                arrival_time += [0]
+            arrival_time = [0 if val is None else val for val in departure_time]
             arrival = SimpleDatetime(date=arrival_date, time=arrival_time)
+
+            if departure_time[0] is None or arrival_time[0] is None:
+                import ipdb; ipdb.set_trace()
 
             plane_type = single_flight[17]
 
@@ -105,6 +119,7 @@ def parse_js(js: str):
                 carbon=CarbonEmission(
                     typical_on_route=typical_carbon_emission, emission=carbon_emission
                 ),
+                total_duration=total_duration,
             )
         )
 

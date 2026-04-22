@@ -55,3 +55,4 @@ class Flights:
     airlines: list[str]
     flights: list[SingleFlight]
     carbon: CarbonEmission
+    total_duration: str
