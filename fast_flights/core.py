@@ -6,7 +6,7 @@ from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from .decoder import DecodedResult, ResultDecoder
 from .schema import Flight, Result
-from .flights_impl import FlightData, Passengers
+from .flights_impl import FlightData, Passengers, Bags
 from .filter import TFSData
 from .fallback_playwright import fallback_playwright_fetch
 from .bright_data_fetch import bright_data_fetch
@@ -91,8 +91,31 @@ def get_flights(
     seat: Literal["economy", "premium-economy", "business", "first"],
     fetch_mode: Literal["common", "fallback", "force-fallback", "local", "bright-data"] = "common",
     max_stops: Optional[int] = None,
-    data_source: DataSource = 'html',
-) -> Union[Result, DecodedResult, None]:
+    max_price: Optional[int] = None,
+    bags: Optional[Bags] = None,
+    no_self_transfer: Optional[bool] = None,
+    data_source: 'DataSource' = 'html',
+    currency: str = ''
+) -> Union['Result', 'DecodedResult', None]:
+    """
+    Constructs and executes a flight search request.
+
+    Args:
+        flight_data (List[FlightData]): A list of FlightData objects for the itinerary.
+        trip (Literal["round-trip", "one-way", "multi-city"]): The trip type.
+        passengers (Passengers): The passenger configuration.
+        seat (Literal["economy", "premium-economy", "business", "first"]): The class of service.
+        fetch_mode (Literal[...], optional): Specifies the data fetching mode. Defaults to "common".
+        max_stops (Optional[int], optional): Maximum number of stops allowed per flight.
+        max_price (Optional[int], optional): Maximum total price for the itinerary.
+        bags (Optional[Bags], optional): Baggage filter information.
+        no_self_transfer (Optional[bool], optional): If True, exclude self-transfer flights.
+        data_source (DataSource, optional): The source for the flight data. Defaults to 'html'.
+        currency (str, optional): The currency to be displayed.
+        
+    Returns:
+        Union[Result, DecodedResult, None]: The flight search result.
+    """
     return get_flights_from_filter(
         TFSData.from_interface(
             flight_data=flight_data,
@@ -100,9 +123,13 @@ def get_flights(
             passengers=passengers,
             seat=seat,
             max_stops=max_stops,
+            max_price=max_price,
+            bags=bags,
+            no_self_transfer=no_self_transfer,
         ),
         mode=fetch_mode,
         data_source=data_source,
+        currency=currency
     )
 
 
@@ -148,12 +175,15 @@ def parse_response(
             )
             # from_airport - to_airport
             from_to_airport_node = item.css("span.PTuQse.sSHqwe.tPgKwe.ogfYpf div.QylvBf span span span")
-            try:
-                from_airport = from_to_airport_node[0].text(strip=True)
-                to_airport = from_to_airport_node[1].text(strip=True)
-            except IndexError:
-                from_airport = ""
-                to_airport = ""
+            from_to_airport_backup_node = item.css("span.sSHqwe.tPgKwe.ogfYpf div.QylvBf span span span")
+            from_airport = ""
+            to_airport = ""
+            for airport_node in [from_to_airport_node, from_to_airport_backup_node]:
+                try:
+                    from_airport = airport_node[0].text(strip=True)
+                    to_airport = airport_node[1].text(strip=True)
+                except IndexError:
+                    continue
 
             # Get departure & arrival time
             dp_ar_node = item.css("span.mv1WYe div")
